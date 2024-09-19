@@ -35,9 +35,9 @@ requires-python = ">= 3.10"
 dependencies = [
     "aiortc",
     "av",
+    "cryptography",
     "flitter-lang",
     "loguru",
-    "numpy",
     "tornado",
 ]
 
@@ -50,7 +50,7 @@ Issues = "https://github.com/jonathanhogg/flitter-webrtc/issues"
 webrtc = "flitter_webrtc.shader:WebRTC"
 
 [project.entry-points."flitter_webrtc.signalling"]
-socket = "flitter_webrtc.signalling:Socket"
+broadcast = "flitter_webrtc.signalling:Broadcast"
 
 [tool.setuptools.packages.find]
 where = ["src"]

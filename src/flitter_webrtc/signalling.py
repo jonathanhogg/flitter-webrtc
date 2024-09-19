@@ -1,12 +1,12 @@
 
 import asyncio
-import hashlib
 import json
 import socket
 import zlib
 
-import aiortc
 from loguru import logger
+
+from .cipher import Cipher, DecryptionError
 
 
 class Signalling:
@@ -17,26 +17,26 @@ class Signalling:
         raise NotImplementedError()
 
 
-def message_digest(auth, message):
-    hash = hashlib.sha256()
-    hash.update(auth.encode('utf8'))
-    for key in sorted(message.keys()):
-        if key != 'digest':
-            hash.update(key.encode('utf8'))
-            hash.update(str(message[key]).encode('utf8'))
-    return hash.hexdigest()
-
-
-class Socket(Signalling):
-    BUFSIZE = 4096
+class Broadcast(Signalling):
+    DEFAULT_PORT = 5111
+    DEFAULT_SECRET = 'flitter_webrtc'
+    BUFSIZE = 1500
+    WAIT = 5
 
     def __init__(self):
         self._port = None
         self._host = None
-        self._my_id = None
         self._call_id = None
-        self._auth = None
+        self._answer_id = None
+        self._secret = None
         self._run_task = None
+
+    def __str__(self):
+        if self._call_id:
+            return f"broadcast call to '{self._call_id}' at :{self._port}"
+        elif self._answer_id:
+            return f"broadcast answer to '{self._answer_id}' at :{self._port}"
+        return "broadcast signalling"
 
     async def release(self):
         if self._run_task is not None:
@@ -45,12 +45,12 @@ class Socket(Signalling):
             self._run_task = None
 
     async def update(self, webrtc, node):
-        port = node.get('port', 1, int)
-        host = node.get('host', 1, str)
-        my_id = node.get('id', 1, str)
+        port = node.get('port', 1, int, self.DEFAULT_PORT)
+        host = node.get('host', 1, str, '')
         call_id = node.get('call', 1, str)
-        auth = node.get('auth', 1, str)
-        if port != self._port or host != self._host or my_id != self._my_id or call_id != self._call_id or auth != self._auth:
+        answer_id = node.get('answer', 1, str)
+        secret = node.get('secret', 1, str, self.DEFAULT_SECRET)
+        if port != self._port or host != self._host or call_id != self._call_id or answer_id != self._answer_id or secret != self._secret:
             await webrtc.close_peer_connection()
             if self._run_task is not None:
                 if not self._run_task.done():
@@ -59,92 +59,77 @@ class Socket(Signalling):
                 self._run_task = None
             self._port = port
             self._host = host
-            self._my_id = my_id
             self._call_id = call_id
-            self._auth = auth
-            if self._my_id is not None and self._port is not None:
+            self._answer_id = answer_id
+            self._secret = secret
+            if self._call_id or self._answer_id:
                 self._run_task = asyncio.create_task(self.run(webrtc))
 
     async def run(self, webrtc):
-        logger.debug("Using socket signalling on {}:{}", self._host, self._port)
         try:
+            logger.debug("Started broadcast signalling")
             loop = asyncio.get_event_loop()
+            cipher = Cipher(self._secret, self._call_id or self._answer_id)
             while True:
-                pc = await webrtc.create_peer_connection()
+                await webrtc.create_peer_connection()
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sock.setblocking(False)
-                if self._call_id is None:
-                    if self._host:
-                        address = self._host, self._port
-                    else:
-                        address = '', self._port
-                else:
-                    address = '', 0
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
-                    sock.bind(address)
+                    if self._call_id:
+                        sock.bind((self._host, 0))
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                        send_address = ('<broadcast>', self._port)
+                    else:
+                        sock.bind((self._host, self._port))
                 except (OSError, OverflowError):
-                    logger.error("Unable to bind to {}:{}", host, port)
-                if self._call_id and not self._host:
-                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                    send_address = '<broadcast>', self._port
-                else:
-                    send_address = self._host, self._port
-                if self._call_id is not None:
-                    await pc.setLocalDescription(await pc.createOffer())
+                    logger.error("Unable to bind socket")
+                logger.trace("Using UDP socket on {}:{}", *sock.getsockname())
+                if self._call_id:
+                    await webrtc.create_offer()
                     state = 'offer'
                 else:
                     state = 'wait'
                 retries = 5
-                peer_id = self._call_id
-                while pc.connectionState in {'new', 'connecting'}:
+                while webrtc.connection_state in ('new', 'connecting'):
                     message = None
                     if state == 'offer':
-                        message = {'offer': pc.localDescription.sdp}
+                        message = {'offer': webrtc.offer}
                     elif state == 'answer':
-                        message = {'answer': pc.localDescription.sdp}
+                        message = {'answer': webrtc.answer}
                     if message is not None:
                         if retries == 0:
                             logger.debug("Too many retries; reset signalling")
                             break
-                        logger.debug("Send: {}", message)
-                        message['from'] = self._my_id
-                        message['to'] = peer_id
-                        if self._auth:
-                            message['digest'] = message_digest(self._auth, message)
-                        data = zlib.compress(json.dumps(message).encode('utf8'))
+                        logger.trace("Send: {}", message)
+                        data = cipher.encrypt(zlib.compress(json.dumps(message).encode('utf8'), 9))
                         await loop.sock_sendto(sock, data, send_address)
                         retries -= 1
                     while True:
                         try:
-                            message, address = await asyncio.wait_for(loop.sock_recvfrom(sock, self.BUFSIZE), 5)
-                            message = json.loads(zlib.decompress(message).decode('utf8'))
-                            if self._auth and (digest := message_digest(self._auth, message)) != message.pop('digest', None):
-                                logger.warning("Rejecting message with auth mismatch")
-                                continue
-                            if message.pop('to', None) != self._my_id:
-                                logger.warning("Rejecting message with id mismatch")
-                                continue
-                            logger.debug("Received: {}", message)
-                            if state == 'wait':
-                                if (offer := message.get('offer')) is not None:
-                                    await pc.setRemoteDescription(aiortc.RTCSessionDescription(type='offer', sdp=offer))
-                                    await pc.setLocalDescription(await pc.createAnswer())
-                                    state = 'answer'
-                                    peer_id = message['from']
-                                    send_address = address
-                                    retries = 5
-                                    break
-                            elif state == 'offer':
-                                if (answer := message.get('answer')) is not None:
-                                    await pc.setRemoteDescription(aiortc.RTCSessionDescription(type='answer', sdp=answer))
-                                    state = 'done'
-                                    break
+                            data, address = await asyncio.wait_for(loop.sock_recvfrom(sock, self.BUFSIZE), self.WAIT)
+                            message = json.loads(zlib.decompress(cipher.decrypt(data, ttl=self.WAIT*2)).decode('utf8'))
+                            logger.trace("Received: {}", message)
+                            if state == 'wait' and (offer := message.get('offer')) is not None:
+                                await webrtc.create_answer(offer)
+                                state = 'answer'
+                                send_address = address
+                                retries = 5
+                                break
+                            elif state == 'offer' and (answer := message.get('answer')) is not None:
+                                await webrtc.finish(answer)
+                                state = 'done'
+                                break
+                            else:
+                                logger.debug("Ignoring unexpected message")
                         except (zlib.error, UnicodeDecodeError, json.JSONDecodeError):
-                            pass
+                            logger.warning("Ignoring badly encoded message")
+                        except DecryptionError:
+                            logger.warning("Ignoring incorrectly encrypted message (may not be intended for us)")
                         except asyncio.TimeoutError:
                             break
                 sock.close()
-                if pc.connectionState == 'connected':
+                if webrtc.connection_state == 'connected':
                     break
                 await webrtc.close_peer_connection()
         except asyncio.CancelledError:
@@ -152,4 +137,5 @@ class Socket(Signalling):
         except Exception:
             logger.exception("Unexpected error in WebRTC broadcast signalling")
             await webrtc.close_peer_connection()
-        logger.debug("Stopped socket signalling")
+        finally:
+            logger.debug("Stopped broadcast signalling")

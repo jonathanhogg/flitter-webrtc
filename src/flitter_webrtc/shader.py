@@ -5,10 +5,8 @@ Flitter WebRTC Plugin
 import asyncio
 
 import aiortc
-import av
 from av.video.reformatter import VideoReformatter
 from loguru import logger
-import numpy as np
 
 from flitter.model import Vector, null
 from flitter.plugins import get_plugin
@@ -97,8 +95,13 @@ class WebRTC(ProgramNode):
         self._remote_track_task = asyncio.create_task(self.consume_remote_track(track))
 
     async def connection_state_change(self):
-        if self._peer_connection is not None and self._peer_connection.connectionState in ('closed', 'failed'):
-            await self.reset_connection()
+        state = self._peer_connection.connectionState
+        if state == 'connected':
+            logger.success("WebRTC connection up via {}", self._signalling)
+        elif state in ('closed', 'failed'):
+            logger.info("WebRTC connection {}", state)
+            if self._peer_connection is not None:
+                await self.reset_connection()
 
     async def consume_remote_track(self, track):
         try:
@@ -119,6 +122,32 @@ class WebRTC(ProgramNode):
         self._peer_connection.add_listener('connectionstatechange', self.connection_state_change)
         self._peer_connection.addTrack(RenderTrack(self))
         return self._peer_connection
+
+    @property
+    def connection_state(self):
+        return self._peer_connection.connectionState
+
+    async def create_offer(self):
+        offer = await self._peer_connection.createOffer()
+        await self._peer_connection.setLocalDescription(offer)
+        return offer.sdp
+
+    @property
+    def offer(self):
+        return self._peer_connection.localDescription.sdp
+
+    async def create_answer(self, offer):
+        await self._peer_connection.setRemoteDescription(aiortc.RTCSessionDescription(type='offer', sdp=offer))
+        answer = await self._peer_connection.createAnswer()
+        await self._peer_connection.setLocalDescription(answer)
+        return answer.sdp
+
+    @property
+    def answer(self):
+        return self._peer_connection.localDescription.sdp
+
+    async def finish(self, answer):
+        await self._peer_connection.setRemoteDescription(aiortc.RTCSessionDescription(type='answer', sdp=answer))
 
     async def close_peer_connection(self):
         if self._remote_track_task is not None:

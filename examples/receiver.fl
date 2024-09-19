@@ -3,7 +3,7 @@ let SIZE=1920;1080
 
 !window size=SIZE title="Receiver"
     !webrtc state=:webrtc
-        !socket port=51111 id=:receiver auth="superSecret123"
+        !broadcast answer=:receiver
         !canvas3d id=:content samples=4 viewpoint=0;0;1000 fov_ref=:narrow fov=0.15 far=2000
             !light color=1 direction=0;0;-1
             !sphere invert=true size=1000 color=0;0;0.5
