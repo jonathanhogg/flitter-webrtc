@@ -15,6 +15,16 @@ incoming video track will be rendered to the output image of this node. If no
 WebRTC connection is currently active, the node will return its composited
 input (and thus acts like a bare `!shader` node).
 
+The `!webrtc` node supports the single attribute:
+
+- `state=` *KEY* \
+This provides a state key that will be used to store the current WebRTC
+connection state. If no connection is active, this key will be empty (i.e.,
+will return `null`). If a connection is active then the value will be one of:
+`:connected`, `:connecting`, `:closed`, `:failed`, `:new`. As re-connection is
+attempted immediately, this state key will normally resolve to either
+`:connected` or `:connecting`.
+
 Setting up a WebRTC connection between two endpoints is controlled by a
 separate *signalling* protocol, defined by adding a signalling node within
 the `!webrtc` node. Signalling protocols can be added through the **Flitter**
