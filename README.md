@@ -13,7 +13,15 @@ This provides a two-way video "call" endpoint. Nodes within this will be
 rendered, composited and then transmitted as the outgoing video track, the
 incoming video track will be rendered to the output image of this node. If no
 WebRTC connection is currently active, the node will return its composited
-input (and thus acts like a bare `!shader` node).
+input (similar to a bare `!shader` node).
+
+Video streams between `!webrtc` nodes are always two-way. If a `!webrtc` node
+contains no (visible) render nodes then it will transmit a black video stream.
+For one-way streams, just ignore the blank output at the other end. A program
+may contain multiple `!webrtc` nodes, including nested nodes that pass
+(possibly manipulated) video through from one instance to another. See
+[examples/tranceiver.fl](https://github.com/jonathanhogg/flitter-webrtc/blob/main/examples/tranceiver.fl)
+for an example of this.
 
 The `!webrtc` node supports the single attribute:
 
@@ -29,6 +37,10 @@ Setting up a WebRTC connection between two endpoints is controlled by a
 separate *signalling* protocol, defined by adding a signalling node within
 the `!webrtc` node. Signalling protocols can be added through the **Flitter**
 plugin API. The following signalling nodes are provided by this plugin:
+
+Note that `!webrtc` nodes are *always* 8-bit sRGB and will ignore any direct
+setting of a `colorbits=` attribute or the `!window` default `colorbits=`
+setting.
 
 ### `!broadcast`
 

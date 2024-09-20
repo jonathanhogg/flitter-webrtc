@@ -9,5 +9,5 @@ let SIZE=1920;1080
             !sphere invert=true size=1000 color=0;0;0.5
             !box size=500 color=1;1;0 rotation=clock/30
     if $:webrtc == :connected
-        !transform translate=SIZE/3 scale=0.25
+        !transform translate=-SIZE/3 scale=0.25
             !reference id=:content

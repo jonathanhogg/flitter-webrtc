@@ -1,0 +1,11 @@
+
+let SIZE=1920;1080
+
+!offscreen size=SIZE title="Tranceiver"
+    !webrtc id=:return state=:outgoing
+        !broadcast call=:receiver
+        !feedback mixer=0.5
+            !webrtc state=:incoming
+                !broadcast answer=:tranceiver
+                !feedback mixer=0.5
+                    !reference id=:return
