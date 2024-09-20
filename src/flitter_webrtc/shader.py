@@ -43,15 +43,18 @@ class WebRTC(ProgramNode):
 
     @property
     def framebuffer(self):
-        return (self._remote_target or self._target).framebuffer
+        target = self._remote_target or self._target
+        return target.framebuffer if target is not None else None
 
     @property
     def texture(self):
-        return (self._remote_target or self._target).texture
+        target = self._remote_target or self._target
+        return target.texture if target is not None else None
 
     @property
-    def texture_data(self):
-        return (self._remote_target or self._target).texture_data
+    def array(self):
+        target = self._remote_target or self._target
+        return target.array if target is not None else None
 
     async def reset_connection(self):
         if self._signalling is not None:
@@ -89,7 +92,7 @@ class WebRTC(ProgramNode):
         if self._signalling is not None:
             await self._signalling.update(self, signalling_node)
         super().render(node, references, colorbits=8, srgb=True, **kwargs)
-        self._retain_target = self._peer_connection is not None
+        self._retain_target = self._peer_connection is not None and self._peer_connection.connectionState == 'connected'
 
     def add_remote_track(self, track):
         self._remote_track_task = asyncio.create_task(self.consume_remote_track(track))
