@@ -6,15 +6,8 @@ import zlib
 
 from loguru import logger
 
+from . import Signalling
 from .cipher import Cipher, DecryptionError
-
-
-class Signalling:
-    async def release(self):
-        raise NotImplementedError()
-
-    async def update(self, node):
-        raise NotImplementedError()
 
 
 class Broadcast(Signalling):

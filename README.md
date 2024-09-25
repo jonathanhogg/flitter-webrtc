@@ -74,9 +74,9 @@ All signalling messages are encrypted using the
 from the `call=`/`answer=` connection *ID* and the value of `secret=`. As the
 *ID* is used for key derivation, secrecy generally can be guaranteed by
 simply using unguessable values for the connection *ID*. However, supplying
-the `secret=` attribute allows a group of nodes to share a common secret and
-then use public *ID* values (such as a host or user name) to establish
-connections.
+the `secret=` attribute allows a group of nodes to share a common secret (like
+a private chat room name) and then use public *ID* values (like a user name) to
+establish connections.
 
 If both `answer=` and `call=` are provided, then `call=` takes priority and
 this endpoint will attempt an outgoing connection. Changes to any of the

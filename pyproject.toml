@@ -38,7 +38,7 @@ dependencies = [
     "cryptography",
     "flitter-lang",
     "loguru",
-    "tornado",
+    "python-socketio",
 ]
 
 [project.urls]
@@ -50,7 +50,7 @@ Issues = "https://github.com/jonathanhogg/flitter-webrtc/issues"
 webrtc = "flitter_webrtc.shader:WebRTC"
 
 [project.entry-points."flitter_webrtc.signalling"]
-broadcast = "flitter_webrtc.signalling:Broadcast"
+broadcast = "flitter_webrtc.signalling.broadcast:Broadcast"
 
 [tool.setuptools.packages.find]
 where = ["src"]
