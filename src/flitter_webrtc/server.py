@@ -12,13 +12,14 @@ class Room:
         self.name = name
         self._members = {}
 
+    def __contains__(self, user):
+        return user in self._members
+
     async def notify_all(self):
         msg = json.dumps({'type': 'members', 'members': list(self._members)})
         await asyncio.gather(*(ws.send_str(msg) for ws in self._members.values()))
 
     async def add(self, user, ws):
-        if user in self._members:
-            raise ValueError("User already taken")
         self._members[user] = ws
         logger.info("User '{}' joined room '{}'", user, self.name)
         await self.notify_all()
@@ -42,6 +43,13 @@ class SignallingServer:
     def run(self, **kwargs):
         web.run_app(self._app, **kwargs)
 
+    def get_room(self, name):
+        if name not in self._rooms:
+            room = self._rooms[name] = Room(name)
+        else:
+            room = self._rooms[name]
+        return room
+
     async def handle_client(self, request):
         ws = web.WebSocketResponse()
         await ws.prepare(request)
@@ -51,20 +59,27 @@ class SignallingServer:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     msg = json.loads(msg.data)
-                    logger.debug("Received from client: {}", msg)
-                    if msg.get('type') == 'join' and (user := msg.get('id')) is not None:
-                        room_name = msg.get('room')
-                        if room_name not in self._rooms:
-                            room = self._rooms[room_name] = Room(room_name)
-                        else:
-                            room = self._rooms[room_name]
-                        await room.add(user, ws)
-                    elif user and (to := msg.get('to')) is not None:
+                    logger.trace("Received from client: {}", msg)
+                    if room is None:
+                        if msg['type'] == 'join':
+                            user = msg['id']
+                            requested_room = self.get_room(msg['room'])
+                            if user not in requested_room:
+                                room = requested_room
+                                await room.add(user, ws)
+                            else:
+                                await ws.send_str(json.dumps({'type': 'error', 'error': 'User ID already taken'}))
+                                break
+                    elif (to := msg.get('to')) is not None:
                         msg['from'] = user
                         await room.send(to, msg)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    logger.error(f"Connection closed with exception: {ws.exception()}")
+                    logger.error("Connection closed with exception: {}", str(ws.exception()))
                     break
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.error("Protocol error: {}", str(exc))
+        except Exception:
+            logger.exception("Unexpected error")
         finally:
             if room is not None:
                 await room.remove(user)
