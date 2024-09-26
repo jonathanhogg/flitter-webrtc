@@ -11,3 +11,4 @@ __pycache__
 /src/**/*.so
 /src/**/*.pyd
 /src/flitter_webrtc.egg-info
+*.pem

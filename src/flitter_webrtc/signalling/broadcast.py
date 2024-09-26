@@ -128,7 +128,7 @@ class Broadcast(Signalling):
         except asyncio.CancelledError:
             pass
         except Exception:
-            logger.exception("Unexpected error in WebRTC broadcast signalling")
+            logger.exception("Unexpected error in broadcast signalling")
             await webrtc.close_peer_connection()
         finally:
             logger.debug("Stopped broadcast signalling")

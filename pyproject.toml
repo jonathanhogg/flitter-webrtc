@@ -33,12 +33,12 @@ classifiers = [
 ]
 requires-python = ">= 3.10"
 dependencies = [
+    "aiohttp",
     "aiortc",
     "av",
     "cryptography",
     "flitter-lang",
     "loguru",
-    "python-socketio",
 ]
 
 [project.urls]
@@ -46,11 +46,15 @@ Documentation = "https://flitter.readthedocs.io/"
 Repository = "https://github.com/jonathanhogg/flitter-webrtc.git"
 Issues = "https://github.com/jonathanhogg/flitter-webrtc/issues"
 
+[project.scripts]
+flitter_webrtc = "flitter_webrtc.__main__:main"
+
 [project.entry-points."flitter.render.window"]
 webrtc = "flitter_webrtc.shader:WebRTC"
 
 [project.entry-points."flitter_webrtc.signalling"]
 broadcast = "flitter_webrtc.signalling.broadcast:Broadcast"
+websocket = "flitter_webrtc.signalling.websocket:WebSocket"
 
 [tool.setuptools.packages.find]
 where = ["src"]

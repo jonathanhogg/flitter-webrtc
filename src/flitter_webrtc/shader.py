@@ -133,7 +133,6 @@ class WebRTC(ProgramNode):
     async def create_offer(self):
         offer = await self._peer_connection.createOffer()
         await self._peer_connection.setLocalDescription(offer)
-        return offer.sdp
 
     @property
     def offer(self):
@@ -143,7 +142,6 @@ class WebRTC(ProgramNode):
         await self._peer_connection.setRemoteDescription(aiortc.RTCSessionDescription(type='offer', sdp=offer))
         answer = await self._peer_connection.createAnswer()
         await self._peer_connection.setLocalDescription(answer)
-        return answer.sdp
 
     @property
     def answer(self):
