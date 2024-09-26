@@ -18,7 +18,7 @@ def main():
     levels.add_argument('--debug', action='store_const', const='DEBUG', dest='level', help="Debug logging")
     levels.add_argument('--verbose', action='store_const', const='INFO', dest='level', help="Informational logging")
     levels.add_argument('--quiet', action='store_const', const='WARNING', dest='level', help="Only log warnings and errors")
-    parser.add_argument('--port', type=int, default=8080, help="Port to listen on")
+    parser.add_argument('--port', type=int, default=None, help="Port to listen on")
     parser.add_argument('--host', type=str, default='', help="Hostname to listen on")
     parser.add_argument('--certificate', type=Path, default=None, help="Certificate file to use")
     parser.add_argument('--key', type=Path, default=None, help="Certificate private key file to use")

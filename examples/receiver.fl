@@ -4,7 +4,7 @@ let SIZE=1920;1080
 !window size=SIZE title="Receiver"
     !webrtc state=:webrtc
         if URL
-            !websocket url=URL room='test' id='receiver'
+            !websocket url=URL verify=false room='test' id='receiver'
         else
             !broadcast answer='receiver'
         !canvas3d id=:content samples=4 viewpoint=0;0;1000 fov_ref=:narrow fov=0.15 far=2000

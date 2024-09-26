@@ -10,28 +10,25 @@ from loguru import logger
 class Room:
     def __init__(self, name):
         self.name = name
-        self._members = {}
-
-    def __contains__(self, user):
-        return user in self._members
+        self.members = {}
 
     async def notify_all(self):
-        msg = json.dumps({'type': 'members', 'members': list(self._members)})
-        await asyncio.gather(*(ws.send_str(msg) for ws in self._members.values()))
+        msg = json.dumps({'type': 'members', 'members': list(self.members)})
+        await asyncio.gather(*(ws.send_str(msg) for ws in self.members.values()))
 
     async def add(self, user, ws):
-        self._members[user] = ws
-        logger.info("User '{}' joined room '{}'", user, self.name)
+        self.members[user] = ws
+        logger.debug("User '{}' joined room '{}'", user, self.name)
         await self.notify_all()
 
     async def remove(self, user):
-        del self._members[user]
-        logger.info("User '{}' left room '{}'", user, self.name)
+        del self.members[user]
+        logger.debug("User '{}' left room '{}'", user, self.name)
         await self.notify_all()
 
     async def send(self, user, msg):
-        if user in self._members:
-            await self._members[user].send_str(json.dumps(msg))
+        if user in self.members:
+            await self.members[user].send_str(json.dumps(msg))
 
 
 class SignallingServer:
@@ -45,6 +42,7 @@ class SignallingServer:
 
     def get_room(self, name):
         if name not in self._rooms:
+            logger.debug("Created new room '{}'", name)
             room = self._rooms[name] = Room(name)
         else:
             room = self._rooms[name]
@@ -64,7 +62,7 @@ class SignallingServer:
                         if msg['type'] == 'join':
                             user = msg['id']
                             requested_room = self.get_room(msg['room'])
-                            if user not in requested_room:
+                            if user not in requested_room.members:
                                 room = requested_room
                                 await room.add(user, ws)
                             else:
@@ -83,4 +81,7 @@ class SignallingServer:
         finally:
             if room is not None:
                 await room.remove(user)
+                if not room.members:
+                    del self._rooms[room.name]
+                    logger.debug("Discarded empty room '{}'", room.name)
         return ws

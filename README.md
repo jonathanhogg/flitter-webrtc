@@ -47,24 +47,24 @@ setting.
 This provides a simple local-network signalling protocol based on broadcasting
 messages between UDP sockets. The following attributes are supported:
 
-- `call=` *ID* \
+- `call=` *STRING* \
 Indicates that this WebRTC node is to make an outgoing connection to another
-node with the identifier *ID*.
+node with the given identifier.
 
-- `answer=` *ID* \
+- `answer=` *STRING* \
 Indicates that this WebRTC node is to wait for an incoming connection made with
-the identifier *ID*.
+this identifier.
 
-- `secret=` *SECRET* \
+- `secret=` *STRING* \
 Provides an arbitrary string value that will be used for encrypting the
-signalling messages; both endpoints *must* use the same *SECRET* value; default
-is `flitter_webrtc`.
+signalling messages; both endpoints *must* use the same value; default is
+`flitter_webrtc`.
 
-- `port=` *PORT* \
+- `port=` *INTEGER* \
 Specifies the UDP port to bind to if awaiting a connection or to send broadcast
 messages to if originating a connection; default is port 5111.
 
-- `host=` *HOST* \
+- `host=` *STRING* \
 Specifies a hostname or IP address of the local interface that should be used
 for communication (this is *not* the address of the host being called);
 default is the "any" IP address.
@@ -82,3 +82,68 @@ If both `answer=` and `call=` are provided, then `call=` takes priority and
 this endpoint will attempt an outgoing connection. Changes to any of the
 attribute values will cause any current connection to be torn down and
 restarts the signalling protocol.
+
+### `!websocket`
+
+This provides a signalling protocol that will work across the Internet, based
+on a WebSocket server. The server is also included (see below for details). The
+following attributes are supported:
+
+- `url=` *URL* \
+This is a required attribute that specifies the address of the signalling
+server to connect to. This should be either an `http`/`https` or `ws`/`wss`
+schema URL – either will result in an attempted WebSocket connection.
+
+- `verify=` *BOOLEAN* \
+Specifies whether to verify the certificate when making an SSL/TLS connection.
+The default is `true` and this should only be set to `false` if testing against
+a server with a self-signed certificate. Encryption will still be used, but
+clients will have no protection against server impersonation.
+
+- `room=` *STRING* \
+This is a required attribute that specifies the name of a "room" that should
+be joined for making or receiving connections. This is an arbitrary string
+value.
+
+- `id=` *STRING* \
+This is a required attribute that specifies the endpoint ID to use when making
+and receiving calls. This ID must be unique within the specified room.
+
+- `call=` *STRING* \
+This is an optional attribute that specifies the endpoint ID to initiate a
+WebRTC connection to. This should be the ID of another endpoint in the same
+room. If this is not specified, then the peer will wait for a connection to
+be initiated by another endpoint.
+
+Note that no video is sent to or from the signalling server. It serves only
+as a mechanism for peers to find each other.
+
+#### Running a signalling server
+
+To run a WebSocket signalling server, execute:
+
+```shell
+% flitter_webrtc [...]
+```
+
+The supported command-line options are:
+
+- `--trace` | `--debug` | `--verbose` | `--quiet` \
+Specifies the level of logging to output to the console.
+
+- `--host=` *HOST* \
+Specifies the IP address/hostname of the interface to listen for WebSocket
+connections on. Default is the "any" IP address.
+
+- `--port=` *PORT* \
+Specifies the port number to listen on. Default is `8080` if no certificate is
+specified or `8443` otherwise.
+
+- `--certificate=` *CERTFILE* \
+Specifies an SSL/TLS PEM certificate file to use. Client connections must use
+the `https` or `wss` schemas.
+
+- `--key=` *KEYFILE* \
+Optionally specifies the matching PEM private key for the certificate. If this
+option is not provided then the certificate file is expected to also contain
+the private key.

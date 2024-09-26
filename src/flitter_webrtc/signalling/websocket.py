@@ -11,6 +11,7 @@ from . import Signalling
 class WebSocket(Signalling):
     def __init__(self):
         self._url = None
+        self._verify = True
         self._call_id = None
         self._answer_id = None
         self._peer_id = None
@@ -30,10 +31,11 @@ class WebSocket(Signalling):
 
     async def update(self, webrtc, node):
         url = node.get('url', 1, str)
+        verify = node.get('verify', 1, bool, True)
         answer_id = node.get('id', 1, str)
         call_id = node.get('call', 1, str)
         room = node.get('room', 1, str)
-        if url != self._url or call_id != self._call_id or answer_id != self._answer_id or room != self._room:
+        if url != self._url or verify != self._verify or call_id != self._call_id or answer_id != self._answer_id or room != self._room:
             await webrtc.close_peer_connection()
             if self._run_task is not None:
                 if not self._run_task.done():
@@ -41,10 +43,11 @@ class WebSocket(Signalling):
                 await self._run_task
                 self._run_task = None
             self._url = url
+            self._verify = verify
             self._call_id = call_id
             self._answer_id = answer_id
             self._room = room
-            if self._url and self._answer_id:
+            if self._url and self._room and self._answer_id:
                 self._run_task = asyncio.create_task(self.run(webrtc))
 
     async def run(self, webrtc):
@@ -54,7 +57,7 @@ class WebSocket(Signalling):
             async with aiohttp.ClientSession() as session:
                 while True:
                     try:
-                        async with session.ws_connect(self._url, ssl=False) as ws:
+                        async with session.ws_connect(self._url, ssl=self._verify) as ws:
                             logger.debug("Connection made to {}", self._url)
                             msg = {'type': 'join', 'id': self._answer_id}
                             if self._room:
@@ -104,7 +107,7 @@ class WebSocket(Signalling):
                         await webrtc.close_peer_connection()
                         self._peer_id = None
                         await asyncio.sleep(1)
-                    except (ConnectionError, aiohttp.client_exceptions.ClientConnectorError) as exc:
+                    except (ConnectionError, aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ServerDisconnectedError) as exc:
                         logger.error("Connection error: {}", str(exc))
                         await webrtc.close_peer_connection()
                         self._peer_id = None
