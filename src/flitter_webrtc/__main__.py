@@ -35,10 +35,10 @@ def main():
         ssl_context.load_cert_chain(args.certificate, keyfile=args.key)
     else:
         ssl_context = None
-    if args.user:
-        os.setuid(getpwnam(args.user).pw_uid)
     if args.group:
         os.setgid(getgrnam(args.group).gr_gid)
+    if args.user:
+        os.setuid(getpwnam(args.user).pw_uid)
     server.run(host=args.host, port=args.port, ssl_context=ssl_context)
 
 
