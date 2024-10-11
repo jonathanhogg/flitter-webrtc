@@ -8,8 +8,10 @@ import os
 from pathlib import Path
 from pwd import getpwnam
 import ssl
+import sys
 
-from flitter import configure_logger
+from loguru import logger
+
 from .server import SignallingServer
 
 
@@ -28,7 +30,7 @@ def main():
     parser.add_argument('--user', type=str, default=None, help="Switch to this user after loading certificate/key")
     parser.add_argument('--group', type=str, default=None, help="Switch to this group after loading certificate/key")
     args = parser.parse_args()
-    configure_logger(args.level)
+    logger.configure(handlers=[dict(sink=sys.stderr, level=args.level)])
     server = SignallingServer()
     if args.certificate is not None:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
