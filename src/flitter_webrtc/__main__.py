@@ -3,7 +3,10 @@ Flitter WebRTC Signalling Server
 """
 
 import argparse
+from grp import getgrnam
+import os
 from pathlib import Path
+from pwd import getpwnam
 import ssl
 
 from flitter import configure_logger
@@ -22,6 +25,8 @@ def main():
     parser.add_argument('--host', type=str, default='', help="Hostname to listen on")
     parser.add_argument('--certificate', type=Path, default=None, help="Certificate file to use")
     parser.add_argument('--key', type=Path, default=None, help="Certificate private key file to use")
+    parser.add_argument('--user', type=str, default=None, help="Switch to this user after loading certificate/key")
+    parser.add_argument('--group', type=str, default=None, help="Switch to this group after loading certificate/key")
     args = parser.parse_args()
     configure_logger(args.level)
     server = SignallingServer()
@@ -30,6 +35,10 @@ def main():
         ssl_context.load_cert_chain(args.certificate, keyfile=args.key)
     else:
         ssl_context = None
+    if args.user:
+        os.setuid(getpwnam(args.user).pw_uid)
+    if args.group:
+        os.setgid(getgrnam(args.group).gr_gid)
     server.run(host=args.host, port=args.port, ssl_context=ssl_context)
 
 
