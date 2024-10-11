@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--user', type=str, default=None, help="Switch to this user after loading certificate/key")
     parser.add_argument('--group', type=str, default=None, help="Switch to this group after loading certificate/key")
     args = parser.parse_args()
-    logger.configure(handlers=[dict(sink=sys.stderr, level=args.level)])
+    logger.configure(handlers=[dict(sink=sys.stderr, level=args.level if args.level is not None else 'SUCCESS')])
     server = SignallingServer()
     if args.certificate is not None:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
