@@ -17,14 +17,18 @@ class Room:
         await asyncio.gather(*(ws.send_str(msg) for ws in self.members.values()))
 
     async def add(self, user, ws):
+        if user in self.members:
+            return False
         self.members[user] = ws
         logger.debug("User '{}' joined room '{}'", user, self.name)
         await self.notify_all()
+        return True
 
     async def remove(self, user):
-        del self.members[user]
-        logger.debug("User '{}' left room '{}'", user, self.name)
-        await self.notify_all()
+        if user in self.members:
+            del self.members[user]
+            logger.debug("User '{}' left room '{}'", user, self.name)
+            await self.notify_all()
 
     async def send(self, user, msg):
         if user in self.members:
@@ -62,9 +66,8 @@ class SignallingServer:
                         if msg['type'] == 'join':
                             user = msg['id']
                             requested_room = self.get_room(msg['room'])
-                            if user not in requested_room.members:
+                            if await requested_room.add(user, ws):
                                 room = requested_room
-                                await room.add(user, ws)
                             else:
                                 await ws.send_str(json.dumps({'type': 'error', 'error': 'User ID already taken'}))
                                 break
@@ -81,7 +84,7 @@ class SignallingServer:
         finally:
             if room is not None:
                 await room.remove(user)
-                if not room.members:
+                if not room.members and room.name in self._rooms:
                     del self._rooms[room.name]
                     logger.debug("Discarded empty room '{}'", room.name)
         return ws
